@@ -9,12 +9,20 @@ public class GridSystem : MonoBehaviour
     [SerializeField] private GameObject gridObjectPrefab;
     [SerializeField] private GameObject gridObjectTemp;
 
+    private BlockManager blockManagerScript;
+    private GameObject[,] gridMatrix;
+
+    void Awake()
+    {
+        blockManagerScript = FindObjectOfType<BlockManager>();
+
+        blockManagerScript.GetRowColumn(rowCount, columnCount);
+        gridMatrix = new GameObject[rowCount, columnCount];
+    }
     void Start()
     {
         CreateGrid(rowCount, columnCount);
-        Debug.Log(columnCount / 2.0f);
     }
-
 
     void Update()
     {
@@ -28,17 +36,20 @@ public class GridSystem : MonoBehaviour
         {
             for (int y = 0; y < _rowCount; y++)
             {
+                
                 gridObjectTemp = Instantiate(gridObjectPrefab, GetWorldPosition(x, y), Quaternion.identity);
                 gridObjectTemp.name = y + "_" + x;
                 gridObjectTemp.transform.parent = transform;
-
-                FindObjectOfType<BlockManager>().CreateRandomBlock(GetWorldPosition(x, y), gridObjectTemp.name);
+                gridMatrix[y, x] = gridObjectTemp;
+                blockManagerScript.CreateRandomBlock(GetWorldPosition(x, y), gridObjectTemp.name);
 
             }
         }
+        FindObjectOfType<BlockManager>().CheckForBlastables();
+
     }
 
-    private Vector3 GetWorldPosition(int x, int y)
+    Vector3 GetWorldPosition(int x, int y)
     {
         return new Vector3(transform.position.x - columnCount / 2.0f + x + 0.5f, transform.position.y + rowCount / 2.0f - y - 0.5f);
     }
