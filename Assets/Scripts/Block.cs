@@ -38,4 +38,26 @@ public class Block : MonoBehaviour
         spriteRenderer.sortingOrder = rowNumber * -1;
 
     }
+    public void BlastThisBlock()
+    {
+        Destroy(this.gameObject);
+    }
+    public void MoveBlockToGrid(GameObject grid)
+    {
+        StartCoroutine(SmoothLerp(grid.transform.position));
+    }
+    private IEnumerator SmoothLerp(Vector3 position)
+    {
+        Vector3 startingPos = transform.position;
+        float elapsedTime = 0;
+        float time = Vector2.Distance(startingPos, position)/5;
+        while (elapsedTime < time)
+        {
+            transform.position = Vector3.Lerp(startingPos, position, (elapsedTime / time));
+            elapsedTime += Time.deltaTime;
+            yield return null;
+        }
+    }
+
+
 }
