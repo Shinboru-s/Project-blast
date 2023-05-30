@@ -4,6 +4,7 @@ using UnityEngine;
 
 public class BlockManager : MonoBehaviour
 {
+    //A class for holding sprites that different for colors
     [System.Serializable]
     public class DataForGenerate
     {
@@ -14,6 +15,7 @@ public class BlockManager : MonoBehaviour
         public Sprite spriteC;
     }
 
+    //class to hold row and column information of blocks or grids
     public class BlockRowAndColumn
     {
 
@@ -41,18 +43,28 @@ public class BlockManager : MonoBehaviour
     private GameObject blockTemp;
     private int randomInt;
 
+    //a array holding the data of the blocks in the scene
+    //because it is a matrix, we can find blocks with row and column
     private GameObject[,] blockMatrix;
 
+    private GameObject[,] blocksToMove;
+
     //int will storage witch blast list its belongs
-    //-1 is for null
+    //-1 is means it doesnt belong to any list
     //this array created for quick access and control instead of reaching the Block script every time
     private int[,] blastableList;
+
     private List<int> uniqueBlastableListNumbers = new List<int>();
 
     private GameObject previousBlock;
     private int blastListNumberCounter = 0;
 
     private int[] createdNewBlockCounter;
+
+    //to block operations like sprite changes during moving 
+    private List<string> movingBlocks = new List<string>();
+    public bool isWorkInProgress = false;
+
 
     void Awake()
     {
@@ -67,6 +79,7 @@ public class BlockManager : MonoBehaviour
         
     }
 
+    //unlist all blocks
     void ResetLists()
     {
         for (int x = 0; x < rowCount; x++)
@@ -79,15 +92,44 @@ public class BlockManager : MonoBehaviour
         }
     }
 
+    #region Progress Check
+    public void AddToList(string nameOfBlock)
+    {
+        movingBlocks.Add(nameOfBlock);
+        CheckProgress();
+    }
+    public void RemoveFromList(string nameOfBlock)
+    {
+        movingBlocks.Remove(nameOfBlock);
+        CheckProgress();
+    }
+    void CheckProgress()
+    {
+        if (movingBlocks.Count == 0)
+        {
+            isWorkInProgress = false;
+        }
+        else
+        {
+            isWorkInProgress = true;
+        }
+    }
+    #endregion 
+
+
+
+    //this method works from GridSystem to get total row and column count
     public void GetRowColumn(int row, int column)
     {
         rowCount = row;
         columnCount = column;
         blockMatrix = new GameObject[rowCount, columnCount];
+        blocksToMove = new GameObject[rowCount, columnCount];
         blastableList = new int[rowCount, columnCount];
         createdNewBlockCounter = new int[column];
     }
 
+    //also works from GridSystem to create random block on given position
     string[] rowColumn;
     public void CreateRandomBlock(Vector3 blockPosition, string positionInfo)
     {
@@ -109,8 +151,16 @@ public class BlockManager : MonoBehaviour
 
     }
 
-    public void CheckForBlastables()
+
+
+    #region Blastable Check
+    public IEnumerator CheckForBlastables()
     {
+        while (isWorkInProgress==true)
+        {
+            yield return null;
+        }
+
         ResetLists();
 
         //check every row from left to right
@@ -119,10 +169,10 @@ public class BlockManager : MonoBehaviour
             previousBlock = null;
             for (int y = 0; y < columnCount; y++)
             {
-                //turler uyusuyor mu diye kontrol edilir
+                //checking types of two block
                 if (CompareBlockTypes(blockMatrix[x, y], previousBlock)) 
                 {
-                    //eger turler uyusuyorsa blocklar bir listeye ait mi diye kontrol edilir
+                    //checking list number for blocks have any list
                     CheckIndex(x, y, previousBlock);
                 }
                 previousBlock = blockMatrix[x, y];
@@ -143,10 +193,15 @@ public class BlockManager : MonoBehaviour
             }
         }
 
-        //Checking all list numbers for sprite change
+        //Checking all list numbers for sprite change if needed
         CheckBlastableListsForSprtie();
+
+        //checking for deadlock to shuffle
+        DeadlockCheck();
+        
     }
 
+    //checking types of two block
     bool CompareBlockTypes(GameObject activeBlock, GameObject previousBlock)
     {
         if (previousBlock == null)
@@ -157,8 +212,10 @@ public class BlockManager : MonoBehaviour
             return false;
     }
 
+
     int previousBlockRow;
     int previousBlockColumn;
+    //checking list number for blocks have any list
     void CheckIndex(int activeBlockRow, int activeBlockColumn, GameObject previousBlock)
     {
         previousBlockRow = previousBlock.GetComponent<Block>().rowNumber;
@@ -167,9 +224,10 @@ public class BlockManager : MonoBehaviour
         //this means is activeBlock belongs to any blastableList
         if (blastableList[activeBlockRow, activeBlockColumn] >= 0)
         {
+            //previousBlock belongs to any blastableList
             if (blastableList[previousBlockRow, previousBlockColumn] >= 0)
             {
-                //ikisinin de listesi varsa listeleri birlestir
+                //merge two list to get one list
                 MergeBlastableLists(blastableList[activeBlockRow, activeBlockColumn], blastableList[previousBlockRow, previousBlockColumn]);
             }
             else
@@ -179,14 +237,16 @@ public class BlockManager : MonoBehaviour
                 SetListNumber(previousBlockRow, previousBlockColumn, blastableList[activeBlockRow, activeBlockColumn]);
             }
         }
-        else if(blastableList[previousBlockRow, previousBlockColumn] >= 0)
+        //previousBlock belongs to any blastableList
+        else if (blastableList[previousBlockRow, previousBlockColumn] >= 0)
         {
             //add active to previous's list
             SetListNumber(activeBlockRow, activeBlockColumn, blastableList[previousBlockRow, previousBlockColumn]);
         }
+        //neither block belongs to any blastableList
         else
         {
-            //yeni liste numarasi olusturur ve ikisini de o listeye ekler
+            //create new list and add both block
             CreateBlastableList(activeBlockRow, activeBlockColumn);
         }
     }
@@ -220,11 +280,16 @@ public class BlockManager : MonoBehaviour
         blastableList[row, column] = listNumber;
     }
 
+    #endregion
+
+    #region Sprite Check
     int blastableListNumberCounter = 0;
     string currentBlockType;
     void CheckBlastableListsForSprtie()
     {
+        //find out how many different lists there are
         CheckUniqueListNumbers();
+
         for (int i = 0; i < uniqueBlastableListNumbers.Count; i++)
         {
             blastableListNumberCounter = 0;
@@ -234,12 +299,16 @@ public class BlockManager : MonoBehaviour
                 {
                     if (uniqueBlastableListNumbers[i] == blastableList[x, y]) 
                     {
+                        //count how many block with same list number
                         blastableListNumberCounter++;
+
+                        //find type of block with same list number
                         currentBlockType = blockMatrix[x, y].GetComponent<Block>().blockType;
                     }
                 }
             }
 
+            //find which sprite to apply
             CheckForMembership(blastableListNumberCounter, uniqueBlastableListNumbers[i], currentBlockType);
         }
         
@@ -285,6 +354,8 @@ public class BlockManager : MonoBehaviour
             SetAllSpritesToNew(listNumber, dataList[FindCorrectSprite(blockType)].spriteDefault);
         }
     }
+
+    //apply default sprite to all blocks that dont belong to any list
     void SetDefaultSprite()
     {
         for (int y = 0; y < columnCount; y++)
@@ -298,6 +369,8 @@ public class BlockManager : MonoBehaviour
             }
         }
     }
+
+    //apply selected sprite to all blocks with same list number
     void SetAllSpritesToNew(int listNumber, Sprite sprite)
     {
         for (int y = 0; y < columnCount; y++)
@@ -312,6 +385,7 @@ public class BlockManager : MonoBehaviour
         }
     }
 
+    //find sprite from block data list
     int FindCorrectSprite(string blockType)
     {
         for (int i = 0; i < dataList.Length; i++)
@@ -324,6 +398,12 @@ public class BlockManager : MonoBehaviour
         return -1;
     }
 
+    #endregion
+
+    #region Blast blocks and fill grids
+
+    //blast block at specified positon if block have any list number
+    //if block have any list number this means stands with at least one other block of the same color
     public void BlastBlocks(int row, int column)
     {
         if (blastableList[row, column] >= 0) 
@@ -335,6 +415,7 @@ public class BlockManager : MonoBehaviour
                 {
                     if (blastableList[row, column] == blastableList[x, y])
                     {
+                        //destroy block with same list number other blocks
                         DestroyBlock(x, y);
                     }
                 }
@@ -351,26 +432,28 @@ public class BlockManager : MonoBehaviour
 
     void FillAllGrids()
     {
-        //her bir column tek tek doldurularak gidecek
+        //control each column separately
         for (int y = 0; y < columnCount; y++)
         {
             CheckColumn(y);
         }
         ResetCreatedNewBlockCounter();
         ResetLists();
-        CheckForBlastables();
+        StartCoroutine(CheckForBlastables());
     }
     
     void ResetCreatedNewBlockCounter()
     {
         for (int y = 0; y < createdNewBlockCounter.Length; y++)
         {
+            //to count how many blocks created in each column
             createdNewBlockCounter[y] = 0;
         }
     }
 
     void CheckColumn(int column)
     {
+        //find null block in column if there is
         BlockRowAndColumn nullblockInfo = FindNullBlock(column);
         if (nullblockInfo != null)
         {
@@ -387,13 +470,13 @@ public class BlockManager : MonoBehaviour
 
             CheckColumn(column);
         }
-        else
-        {
-            Debug.Log(column + " sutununda bosluk kalmadi");
-        }
+        //else
+        //{
+        //    Debug.Log(column + ". column is complete");
+        //}
     }
 
-
+    //find null block in column if there is
     BlockRowAndColumn FindNullBlock(int column)
     {
         for (int x = rowCount - 1; x >= 0; x--)
@@ -407,7 +490,7 @@ public class BlockManager : MonoBehaviour
         return null;
     }
 
-
+    //are there any block top of null grid
     BlockRowAndColumn FindBlock(int column, int searchStartRow)
     {
         for (int x = searchStartRow; x >= 0; x--)
@@ -424,29 +507,31 @@ public class BlockManager : MonoBehaviour
 
     void SendBlockToNullGrid(BlockRowAndColumn blockInfo, BlockRowAndColumn nullGridInfo)
     {
-        //bos gride blockun gonderilmesi
+        //send block to null grid
         GameObject gridGameObject = FindObjectOfType<GridSystem>().GetGridInfo(nullGridInfo.row, nullGridInfo.column);
         blockMatrix[blockInfo.row, blockInfo.column].GetComponent<Block>().MoveBlockToGrid(gridGameObject);
 
-        //null gridin bulunduga kisima block bilgilerinin atanmasi
+        //assign block information to the null grid
         blockMatrix[nullGridInfo.row, nullGridInfo.column] = blockMatrix[blockInfo.row, blockInfo.column];
         blockMatrix[nullGridInfo.row, nullGridInfo.column].GetComponent<Block>().SetRowColumnNumber(nullGridInfo.row, nullGridInfo.column);
-        blockMatrix[nullGridInfo.row, nullGridInfo.column].GetComponent<Block>().SetSortingLayer();
 
-        //blockun bulundugu kismin nulla atanmasi (cunku artik yeni konumu yukarida verildi)
+
+        //assign the old block info to null (because new location is assigned)
         blockMatrix[blockInfo.row, blockInfo.column] = null;
+
     }
 
+    //same like SendBlockToNullGrid method but its for newly created block
     void SendNewBlockToNullGrid(GameObject block, BlockRowAndColumn nullGridInfo)
     {
         blockMatrix[nullGridInfo.row, nullGridInfo.column] = block;
         GameObject gridGameObject = FindObjectOfType<GridSystem>().GetGridInfo(nullGridInfo.row, nullGridInfo.column);
         block.GetComponent<Block>().MoveBlockToGrid(gridGameObject);
         block.GetComponent<Block>().SetRowColumnNumber(nullGridInfo.row, nullGridInfo.column);
-        blockMatrix[nullGridInfo.row, nullGridInfo.column].GetComponent<Block>().SetSortingLayer();
+
     }
 
-
+    //create new block for null grids
     GameObject CreateNewBlocks(int column)
     {
         createdNewBlockCounter[column]++;
@@ -467,7 +552,59 @@ public class BlockManager : MonoBehaviour
 
         return newBlockTemp;
     }
+    #endregion
 
+
+    bool deadlockSolveStarted = false;
+    void DeadlockCheck()
+    {
+        if(deadlockSolveStarted == false)
+        {
+            CheckUniqueListNumbers();
+
+            //this means there is one unique number and none of the blocks belong to any list
+            if (uniqueBlastableListNumbers.Count == 1 && uniqueBlastableListNumbers[0] == -1)
+            {
+                RandomizeArray();
+            }
+        }
+        
+    }
+
+   
+    void RandomizeArray()
+    {
+        deadlockSolveStarted = true;
+        //a list to temporarily store all blocks
+        List<GameObject> tempList = new List<GameObject>();
+
+        //add all blocks of the original array to list
+        for (int x = 0; x < rowCount; x++)
+        {
+            for (int y = 0; y < columnCount; y++)
+            {
+                tempList.Add(blockMatrix[x, y]);
+            }
+        }
+
+        //send blocks in random locations
+        for (int x = 0; x < rowCount; x++)
+        {
+            for (int y = 0; y < columnCount; y++)
+            {
+                int randomIndex = Random.Range(0, tempList.Count);
+
+                BlockRowAndColumn nullGridInfo = new BlockRowAndColumn(x, y);
+
+                SendNewBlockToNullGrid(tempList[randomIndex], nullGridInfo);
+
+                tempList.RemoveAt(randomIndex);
+            }
+        }
+
+        deadlockSolveStarted = false;
+        StartCoroutine(CheckForBlastables());
+    }
 }
 
 

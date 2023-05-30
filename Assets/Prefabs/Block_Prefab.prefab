@@ -83,7 +83,7 @@ SpriteRenderer:
   m_AdaptiveModeThreshold: 0.5
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
-  m_MaskInteraction: 0
+  m_MaskInteraction: 2
   m_SpriteSortPoint: 0
 --- !u!114 &4471168023541483505
 MonoBehaviour:
@@ -97,4 +97,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e88c532b44fb5154dbb1d5f36fd3fc19, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  moveSpeed: 10
+  destroySpeed: 0.2
+  dropAnimationSpeed: 0.1
   blockType: Blue
+  rowNumber: 0
+  columnNumber: 0
+  blastableListNumber: -1

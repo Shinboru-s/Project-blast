@@ -3,7 +3,8 @@
 --- !u!78 &1
 TagManager:
   serializedVersion: 2
-  tags: []
+  tags:
+  - Grid
   layers:
   - Default
   - TransparentFX
@@ -49,4 +50,7 @@ TagManager:
     locked: 0
   - name: Block
     uniqueID: 3900476747
+    locked: 0
+  - name: Border
+    uniqueID: 1480813465
     locked: 0
